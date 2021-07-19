@@ -1,0 +1,109 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "index3.h"
+
+void indexStart(void) {
+	
+}
+
+unsigned long hash(unsigned char *str) {
+    unsigned long hash = 5381;
+    int c;
+    while (c = *str++)
+        hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+    return hash;
+}
+
+int nodeCount(tNode *root) {	/// Conta os nós existentes na árvore
+    if(root == NULL){
+        return 0;
+    }
+    else {
+        return 1 + nodeCount(root->left) + nodeCount(root->right);
+    }
+}
+
+void indexAddOccur(tNode *r, int fileIdx, int line, long offset) {
+	if (r->count != 0) {		/// Se a palavra recebida já foi registada antes...
+		int k;
+		for (k = 0; k < r->count; k++)			/// Percorre todas as suas ocorrências...
+			if (r->occur[k].fileIdx == fileIdx && r->occur[k].line == line) return;		/// Se já existir essa ocorrência, não faz nada
+		r->occur = realloc(r->occur, (r->count+1)*sizeof(Occurence));	 /// Se não, aloca memória para uma nova ocorrência
+	}	
+	else r->occur = malloc(sizeof(Occurence));		/// Alocar memória para a primeira ocorrência da palavra
+	
+	r->occur[r->count].fileIdx = fileIdx;		/// Índice de ficheiro da nova ocorrência
+	r->occur[r->count].line = line;			/// Linha da nova ocorrência
+	r->occur[r->count++].offset = offset;		/// Offset da nova ocorrência
+}
+
+tNode *indexFindWord(char *data) {
+	Elem *np;
+	for(np = hashtable[hash(s)]; np != NULL; np = np->next)
+		if(strcmp(s, np->name)==0)
+			return np;
+
+	return NULL;
+}
+
+
+void indexAddWord(tNode **r, char *data, int fileIdx, int line, long offset) {
+	if(*r == NULL) {			/// Se esta condição for verdadeira, significa que não encontrou a palavra recebida (Chegou a uma folha da árvore)...
+		*r = malloc(sizeof(tNode));			/// Por isso aloca memória para o seu registo...
+		if(*r == NULL) printf("Erro na alocação de memória!"), exit(1);
+		
+		(*r)->word = strdup(data);
+		(*r)->count = 0;
+		(*r)->occur = NULL;
+		(*r)->left = (*r)->right = NULL;
+		
+		indexAddOccur(*r, fileIdx, line, offset);		/// E adiciona-se a primeira ocorrência
+		return;
+	}
+	
+	int aux = strcmp(data, (*r)->word);			/// Compara-se a palavra recebida com as palavras guardadas na árvore...
+	
+	
+	if(aux == 0) {			/// E se alguma coincidir...		
+		indexAddOccur(*r, fileIdx, line, offset);		/// Adiciona uma ocorrência
+		return;
+	}
+	if(aux < 0)			/// Se não, continua a comparar, até chegar a uma folha
+		return indexAddWord(&((*r)->left), data, fileIdx, line, offset);
+	return indexAddWord(&((*r)->right), data, fileIdx, line, offset);
+}
+
+void freeNode(tNode *rp) {		/// Liberta a memória associada a um nó qualquer da árvore
+	free(rp->word);
+	free(rp->occur);
+	free(rp);
+}
+
+void indexEnd(tNode *rp) {		/// Liberta a memória associada a toda a árvore
+	if(rp == NULL) return;
+	indexEnd(rp->left);
+	indexEnd(rp->right);
+	freeNode(rp);
+}
+
+tNode *treeToSortedList( tNode *r, tNode *link ){
+	tNode * p;
+	if( r == NULL ) return link;
+	p = treeToSortedList( r->left, r );
+	r->left = NULL;
+	r->right = treeToSortedList( r->right, link );
+	return p;
+}
+
+tNode* sortedListToBalancedTree( tNode **listRoot, int n ) {
+	if( n == 0 ) return NULL;
+	tNode *leftChild = sortedListToBalancedTree( listRoot, n/2 );
+	tNode *parent = *listRoot;
+	parent->left = leftChild;
+	*listRoot = (*listRoot)->right;
+	parent->right = sortedListToBalancedTree( listRoot, n - ( n / 2 + 1 ) );
+	return parent;
+}
+
